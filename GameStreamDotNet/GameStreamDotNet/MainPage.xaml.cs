@@ -199,6 +199,23 @@
             return symmetricKeyAlgorithm.CreateSymmetricKey(keyMaterial);
         }
 
+        private static ICipherParameters GenerateCipherKey(byte[] key)
+        {
+            return new KeyParameter(key, 0, 16);
+        }
+
+        private static byte[] DoAesCipher(bool encrypt, ICipherParameters key, byte[] data)
+        {
+            IBufferedCipher cipher = CipherUtilities.GetCipher("AES/ECB/NoPadding");
+
+            int blockRoundedSize = ((data.Length + 15) / 16) * 16;
+            byte[] blockRoundedData = new byte[blockRoundedSize];
+            Array.Copy(data, blockRoundedData, blockRoundedSize);
+
+            cipher.Init(encrypt, key);
+            return cipher.DoFinal(blockRoundedData);
+        }
+
         private byte[] GenerateRandomBytes(int length)
         {
             byte[] randomBytes = new byte[length];
