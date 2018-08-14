@@ -125,9 +125,11 @@
                     {
                         outputTextBox.Text = $"Get server cert status code: {response.StatusCode}\n";
                         string responseContent = await response.Content.ReadAsStringAsync();
-
-                        XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
-                        pairResponse = serializer.Deserialize((await response.Content.ReadAsInputStreamAsync()).AsStreamForRead()) as PairResponse;
+                        using (StringReader reader = new StringReader(responseContent))
+                        {
+                            XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
+                            pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
+                        }
                     }
                 }
             }
@@ -175,8 +177,11 @@
                         string responseContent = await response.Content.ReadAsStringAsync();
 
                         outputTextBox.Text += responseContent + "\n";
-                        XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
-                        pairResponse = serializer.Deserialize((await response.Content.ReadAsInputStreamAsync()).AsStreamForRead()) as PairResponse;
+                        using (StringReader reader = new StringReader(responseContent))
+                        {
+                            XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
+                            pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
+                        }
                     }
                 }
             }
@@ -224,8 +229,11 @@
                         string responseContent = await response.Content.ReadAsStringAsync();
 
                         outputTextBox.Text += responseContent + "\n";
-                        XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
-                        pairResponse = serializer.Deserialize((await response.Content.ReadAsInputStreamAsync()).AsStreamForRead()) as PairResponse;
+                        using (StringReader reader = new StringReader(responseContent))
+                        {
+                            XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
+                            pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
+                        }
                     }
                 }
             }
@@ -244,7 +252,7 @@
             Array.Copy(serverSecretResponse, 0, serverSecret, 0, serverSecret.Length);
             Array.Copy(serverSecretResponse, serverSecret.Length, serverSignature, 0, serverSignature.Length);
 
-            if (!VerifySIgnature(serverSecret, serverSignature, serverCertificate))
+            if (!VerifySignature(serverSecret, serverSignature, serverCertificate))
             {
                 outputTextBox.Text += "Pairing failed.\n";
                 // TODO: Unpair as above.
@@ -341,7 +349,7 @@
             return cipher.DoFinal(blockRoundedData);
         }
 
-        private static bool VerifySIgnature(byte[] data, byte[] signature, X509Certificate certificate)
+        private static bool VerifySignature(byte[] data, byte[] signature, X509Certificate certificate)
         {
             ISigner signer = SignerUtilities.GetSigner("SHA256withRSA");
             signer.Init(false, certificate.GetPublicKey());
