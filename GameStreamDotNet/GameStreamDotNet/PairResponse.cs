@@ -15,7 +15,7 @@
         public bool IsBusy { get; set; }
 
         [XmlElement("paired")]
-        public bool Paired { get; set; }
+        public int Paired { get; set; }
 
         [XmlElement("pairingsecret")]
         public string PairingSecret { get; set; }

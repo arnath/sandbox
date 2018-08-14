@@ -22,6 +22,9 @@
     using Windows.UI.Xaml;
     using Windows.UI.Xaml.Controls;
     using Windows.Web.Http;
+    using System.Linq;
+    using System.Threading.Tasks;
+    using Org.BouncyCastle.Crypto.Prng;
 
     public sealed partial class MainPage : Page
     {
@@ -35,7 +38,7 @@
         public MainPage()
         {
             this.InitializeComponent();
-            this.secureRandom = new SecureRandom();
+            this.secureRandom = new SecureRandom(new CryptoApiRandomGenerator());
         }
 
         private async void PairButton_Click(object sender, RoutedEventArgs e)
@@ -50,7 +53,10 @@
             string pin = GenerateRandomPin();
             byte[] saltAndPin = SaltPin(salt, pin);
 
-            outputTextBox.Text = $"Enter pin: {pin}";
+            // Asymmetric key pair
+            RsaKeyPairGenerator keyPairGenerator = new RsaKeyPairGenerator();
+            keyPairGenerator.Init(new KeyGenerationParameters(new SecureRandom(), 2048));
+            AsymmetricCipherKeyPair keyPair = keyPairGenerator.GenerateKeyPair();
 
             // Certificate issuer and name
             X509Name name = new X509Name("CN=NVIDIA GameStream Client");
@@ -62,12 +68,6 @@
             // Expires in 20 years
             DateTime now = DateTime.UtcNow;
             DateTime expiration = now.AddYears(20);
-
-            // Asymmetric key pair
-            KeyGenerationParameters keyGenerationParameters = new KeyGenerationParameters(this.secureRandom, 2048);
-            RsaKeyPairGenerator keyPairGenerator = new RsaKeyPairGenerator();
-            keyPairGenerator.Init(keyGenerationParameters);
-            AsymmetricCipherKeyPair keyPair = keyPairGenerator.GenerateKeyPair();
 
             X509V3CertificateGenerator generator = new X509V3CertificateGenerator();
             generator.SetIssuerDN(name);
@@ -106,6 +106,30 @@
             byte[] pemCertBytes = Encoding.UTF8.GetBytes(certString);
             byte[] uniqueId = GenerateRandomBytes(8);
 
+            // Unpair before doing anything else in this test app.
+            using (HttpClient httpClient = new HttpClient())
+            {
+                string uriString =
+                    string.Format(
+                        "http://{0}:47989/unpair?uniqueid={1}&uuid={2}",
+                        ipAddressTextBox.Text,
+                        BytesToHex(uniqueId),
+                        Guid.NewGuid());
+                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
+                {
+                    using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
+                    {
+                        outputTextBox.Text = $"Unpair status code: {response.StatusCode}\n";
+                        string responseContent = await response.Content.ReadAsStringAsync();
+                        outputTextBox.Text += responseContent + "\n";
+                    }
+                }
+            }
+
+            await Task.Delay(2000);
+
+            outputTextBox.Text = $"Enter pin: {pin}";
+
             // Get server certificate.
             // TODO: Call should have no timeout because it requires the user to enter a pin.
             PairResponse pairResponse = null;
@@ -125,6 +149,7 @@
                     {
                         outputTextBox.Text = $"Get server cert status code: {response.StatusCode}\n";
                         string responseContent = await response.Content.ReadAsStringAsync();
+                        outputTextBox.Text += responseContent + "\n";
                         using (StringReader reader = new StringReader(responseContent))
                         {
                             XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
@@ -134,7 +159,7 @@
                 }
             }
 
-            if (pairResponse == null || !pairResponse.Paired)
+            if (pairResponse == null || pairResponse.Paired != 1)
             {
                 outputTextBox.Text += "Pairing failed.\n";
                 return;
@@ -158,6 +183,8 @@
             byte[] challenge = GenerateRandomBytes(16);
             byte[] encryptedChallenge = DoAesCipher(true, aesKey, challenge);
 
+            await Task.Delay(2000);
+
             // Send the encrypted challenge to the server.
             // TODO: Call should have a timeout.
             using (HttpClient httpClient = new HttpClient())
@@ -175,7 +202,6 @@
                     {
                         outputTextBox.Text = $"Send challenge status code: {response.StatusCode}\n";
                         string responseContent = await response.Content.ReadAsStringAsync();
-
                         outputTextBox.Text += responseContent + "\n";
                         using (StringReader reader = new StringReader(responseContent))
                         {
@@ -186,7 +212,7 @@
                 }
             }
 
-            if (pairResponse == null || !pairResponse.Paired)
+            if (pairResponse == null || pairResponse.Paired != 1)
             {
                 outputTextBox.Text += "Pairing failed.\n";
                 return;
@@ -197,9 +223,9 @@
             byte[] decryptedServerChallengeResponse = DoAesCipher(false, aesKey, encryptedServerChallengeResponse);
 
             byte[] serverResponse = new byte[hashDigestSize];
-            byte[] serverChallenge = new byte[hashDigestSize];
+            byte[] serverChallenge = new byte[16];
             Array.Copy(decryptedServerChallengeResponse, serverResponse, hashDigestSize);
-            Array.Copy(decryptedServerChallengeResponse, hashDigestSize, serverChallenge, 0, hashDigestSize);
+            Array.Copy(decryptedServerChallengeResponse, hashDigestSize, serverChallenge, 0, 16);
 
             // Using another 16 byte secret, compute a challenge response hash using the secret, 
             // our certificate signature, and the challenge.
@@ -209,6 +235,8 @@
                     hashAlgorithm, 
                     ConcatenateByteArrays(serverChallenge, certificate.GetSignature(), clientSecret));
             byte[] encryptedChallengeResponse = DoAesCipher(true, aesKey, challengeResponseHash);
+
+            await Task.Delay(2000);
 
             // Send the challenge response to the server.
             // TODO: Call should have a timeout.
@@ -227,7 +255,6 @@
                     {
                         outputTextBox.Text = $"Send challenge response status code: {response.StatusCode}\n";
                         string responseContent = await response.Content.ReadAsStringAsync();
-
                         outputTextBox.Text += responseContent + "\n";
                         using (StringReader reader = new StringReader(responseContent))
                         {
@@ -238,7 +265,7 @@
                 }
             }
 
-            if (pairResponse == null || !pairResponse.Paired)
+            if (pairResponse == null || pairResponse.Paired != 1)
             {
                 outputTextBox.Text += "Pairing failed.\n";
                 // TODO: Unpair here by calling http://<blah>/unpair?uniqueid={1}&uuid={2}.
@@ -249,15 +276,108 @@
             byte[] serverSecretResponse = HexToBytes(pairResponse.PairingSecret);
             byte[] serverSecret = new byte[16];
             byte[] serverSignature = new byte[256];
-            Array.Copy(serverSecretResponse, 0, serverSecret, 0, serverSecret.Length);
+            Array.Copy(serverSecretResponse, serverSecret, serverSecret.Length);
             Array.Copy(serverSecretResponse, serverSecret.Length, serverSignature, 0, serverSignature.Length);
 
-            if (!VerifySignature(serverSecret, serverSignature, serverCertificate))
+            if (!VerifySignature(serverSecret, serverSignature, serverCertificate.GetPublicKey()))
             {
                 outputTextBox.Text += "Pairing failed.\n";
                 // TODO: Unpair as above.
                 return;
             }
+
+            // Ensure the server challenge matched what we expected (the PIN was correct).
+            byte[] serverChallengeResponseHash =
+                HashData(
+                    hashAlgorithm,
+                    ConcatenateByteArrays(
+                        challenge,
+                        serverCertificate.GetSignature(),
+                        serverSecret));
+            if (!serverChallengeResponseHash.SequenceEqual(serverResponse))
+            {
+                outputTextBox.Text += "Pairing failed due to wrong pin.\n";
+                // TODO: Unpair as above.
+                return;
+            }
+
+            await Task.Delay(2000);
+
+            // Send the server our signed secret
+            // TODO: Call should have a timeout.
+            byte[] signedSecret = SignData(clientSecret, keyPair.Private);
+            byte[] clientPairingSecret =
+                ConcatenateByteArrays(
+                    clientSecret,
+                    signedSecret);
+            using (HttpClient httpClient = new HttpClient())
+            {
+                string uriString =
+                    string.Format(
+                        "http://{0}:47989/pair?uniqueid={1}&uuid={2}&devicename=roth&updateState=1&clientpairingsecret={3}",
+                        ipAddressTextBox.Text,
+                        BytesToHex(uniqueId),
+                        Guid.NewGuid(),
+                        BytesToHex(clientPairingSecret));
+                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
+                {
+                    using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
+                    {
+                        outputTextBox.Text = $"Send client pairing secret status code: {response.StatusCode}\n";
+                        string responseContent = await response.Content.ReadAsStringAsync();
+                        outputTextBox.Text += responseContent + "\n";
+                        using (StringReader reader = new StringReader(responseContent))
+                        {
+                            XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
+                            pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
+                        }
+                    }
+                }
+            }
+
+            if (pairResponse == null || pairResponse.Paired != 1)
+            {
+                outputTextBox.Text += "Pairing failed.\n";
+                // TODO: Unpair as above.
+                return;
+            }
+
+            await Task.Delay(2000);
+
+            // Do the initial challenge (seems neccessary for us to show as paired).
+            // TODO: Call should have a timeout.
+            using (HttpClient httpClient = new HttpClient())
+            {
+                string uriString =
+                    string.Format(
+                        "http://{0}:47989/pair?uniqueid={1}&uuid={2}&devicename=roth&updateState=1&phrase=pairchallenge",
+                        ipAddressTextBox.Text,
+                        BytesToHex(uniqueId),
+                        Guid.NewGuid());
+                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
+                {
+                    using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
+                    {
+                        outputTextBox.Text = $"Send pair challenge status code: {response.StatusCode}\n";
+                        string responseContent = await response.Content.ReadAsStringAsync();
+                        outputTextBox.Text += responseContent + "\n";
+                        using (StringReader reader = new StringReader(responseContent))
+                        {
+                            XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
+                            pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
+                        }
+                    }
+                }
+            }
+
+            if (pairResponse == null || pairResponse.Paired != 1)
+            {
+                outputTextBox.Text += "Pairing failed.\n";
+                // TODO: Unpair as above.
+                return;
+            }
+
+            outputTextBox.Text = "Pairing succeeded!\n";
         }
 
         private static string GenerateRandomPin()
@@ -280,7 +400,7 @@
             foreach (byte b in value)
             {
                 result.Append(HexAlphabet[b >> 4]);
-                result.Append(HexAlphabet[b & 0xf]);
+                result.Append(HexAlphabet[b & 0x0F]);
             }
 
             return result.ToString();
@@ -349,13 +469,23 @@
             return cipher.DoFinal(blockRoundedData);
         }
 
-        private static bool VerifySignature(byte[] data, byte[] signature, X509Certificate certificate)
+        private static bool VerifySignature(byte[] data, byte[] signature, ICipherParameters key)
         {
             ISigner signer = SignerUtilities.GetSigner("SHA256withRSA");
-            signer.Init(false, certificate.GetPublicKey());
+            signer.Init(false, key);
             signer.BlockUpdate(data, 0, data.Length);
 
             return signer.VerifySignature(signature);
+        }
+
+
+        private static byte[] SignData(byte[] data, ICipherParameters key)
+        {
+            ISigner signer = SignerUtilities.GetSigner("SHA256withRSA");
+            signer.Init(true, key);
+            signer.BlockUpdate(data, 0, data.Length);
+
+            return signer.GenerateSignature();
         }
 
         private byte[] GenerateRandomBytes(int length)
