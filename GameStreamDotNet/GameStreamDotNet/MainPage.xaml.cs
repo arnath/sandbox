@@ -72,11 +72,11 @@
             DateTime expiration = now.AddYears(20);
 
             X509V3CertificateGenerator generator = new X509V3CertificateGenerator();
+            generator.SetSubjectDN(name);
             generator.SetIssuerDN(name);
             generator.SetSerialNumber(serial);
             generator.SetNotBefore(now);
             generator.SetNotAfter(expiration);
-            generator.SetSubjectDN(name);
             generator.SetPublicKey(keyPair.Public);
 
             BouncyCastleX509Certificate certificate =
@@ -87,6 +87,7 @@
             Pkcs12Store store = new Pkcs12Store();
             X509CertificateEntry certificateEntry = new X509CertificateEntry(certificate);
             string friendlyName = "Moonlight Xbox";
+            string password = "password";
             store.SetCertificateEntry(friendlyName, certificateEntry);
             store.SetKeyEntry(
                 friendlyName,
@@ -95,14 +96,14 @@
             string pfxData;
             using (MemoryStream memoryStream = new MemoryStream(512))
             {
-                store.Save(memoryStream, "password".ToCharArray(), this.secureRandom);
+                store.Save(memoryStream, password.ToCharArray(), this.secureRandom);
                 pfxData = CryptographicBuffer.EncodeToBase64String(memoryStream.ToArray().AsBuffer());
             }
 
             await CertificateEnrollmentManager.ImportPfxDataAsync(
                 pfxData,
-                "password",
-                ExportOption.Exportable,
+                password,
+                ExportOption.NotExportable,
                 KeyProtectionLevel.NoConsent,
                 InstallOptions.DeleteExpired,
                 friendlyName);
@@ -172,7 +173,7 @@
             PairResponse pairResponse = null;
             uriString =
                 string.Format(
-                    "http://{0}:47989/pair?uniqueid={1}&uuid={2}&devicename=roth&updateState=1&phrase=getservercert&salt={3}&clientcert={4}",
+                    "https://{0}:47984/pair?uniqueid={1}&uuid={2}&devicename=roth&updateState=1&phrase=getservercert&salt={3}&clientcert={4}",
                     ipAddressTextBox.Text,
                     BytesToHex(uniqueId),
                     Guid.NewGuid(),
