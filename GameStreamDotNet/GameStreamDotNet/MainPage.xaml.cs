@@ -2,29 +2,31 @@
 {
     using System;
     using System.IO;
+    using System.Linq;
     using System.Runtime.InteropServices.WindowsRuntime;
     using System.Text;
+    using System.Threading.Tasks;
     using System.Xml.Serialization;
 
-    using Org.BouncyCastle.Security;
-    using Org.BouncyCastle.Crypto;
-    using Org.BouncyCastle.Crypto.Parameters;
     using Org.BouncyCastle.Asn1.X509;
-    using Org.BouncyCastle.X509;
-    using Org.BouncyCastle.Math;
+    using Org.BouncyCastle.Crypto;
     using Org.BouncyCastle.Crypto.Digests;
     using Org.BouncyCastle.Crypto.Generators;
     using Org.BouncyCastle.Crypto.Operators;
+    using Org.BouncyCastle.Crypto.Parameters;
+    using Org.BouncyCastle.Crypto.Prng;
+    using Org.BouncyCastle.Math;
     using Org.BouncyCastle.OpenSsl;
+    using Org.BouncyCastle.Pkcs;
+    using Org.BouncyCastle.Security;
+    using Org.BouncyCastle.X509;
     using Windows.Security.Cryptography;
-    using Windows.Security.Cryptography.Core;
-    using Windows.Storage.Streams;
+    using Windows.Security.Cryptography.Certificates;
     using Windows.UI.Xaml;
     using Windows.UI.Xaml.Controls;
     using Windows.Web.Http;
-    using System.Linq;
-    using System.Threading.Tasks;
-    using Org.BouncyCastle.Crypto.Prng;
+    using Windows.Web.Http.Filters;
+    using BouncyCastleX509Certificate = Org.BouncyCastle.X509.X509Certificate;
 
     public sealed partial class MainPage : Page
     {
@@ -55,7 +57,7 @@
 
             // Asymmetric key pair
             RsaKeyPairGenerator keyPairGenerator = new RsaKeyPairGenerator();
-            keyPairGenerator.Init(new KeyGenerationParameters(new SecureRandom(), 2048));
+            keyPairGenerator.Init(new KeyGenerationParameters(this.secureRandom, 2048));
             AsymmetricCipherKeyPair keyPair = keyPairGenerator.GenerateKeyPair();
 
             // Certificate issuer and name
@@ -77,9 +79,39 @@
             generator.SetSubjectDN(name);
             generator.SetPublicKey(keyPair.Public);
 
-            X509Certificate certificate =
+            BouncyCastleX509Certificate certificate =
                 generator.Generate(
                     new Asn1SignatureFactory("SHA1WithRSA", keyPair.Private));
+
+            // Create PKCS12 certificate bytes.
+            Pkcs12Store store = new Pkcs12Store();
+            X509CertificateEntry certificateEntry = new X509CertificateEntry(certificate);
+            string friendlyName = "Moonlight Xbox";
+            store.SetCertificateEntry(friendlyName, certificateEntry);
+            store.SetKeyEntry(
+                friendlyName,
+                new AsymmetricKeyEntry(keyPair.Private),
+                new X509CertificateEntry[] { certificateEntry });
+            string pfxData;
+            using (MemoryStream memoryStream = new MemoryStream(512))
+            {
+                store.Save(memoryStream, "password".ToCharArray(), this.secureRandom);
+                pfxData = CryptographicBuffer.EncodeToBase64String(memoryStream.ToArray().AsBuffer());
+            }
+
+            await CertificateEnrollmentManager.ImportPfxDataAsync(
+                pfxData,
+                "password",
+                ExportOption.Exportable,
+                KeyProtectionLevel.NoConsent,
+                InstallOptions.DeleteExpired,
+                friendlyName);
+
+            // Read the modified cert from the cert store
+            Certificate uwpCertificate =
+                (await CertificateStores.FindAllAsync(
+                    new CertificateQuery { FriendlyName = friendlyName }))[0];
+            certificate = new X509CertificateParser().ReadCertificate(uwpCertificate.GetCertificateBlob().AsStream());
 
             string keyString;
             using (StringWriter keyWriter = new StringWriter())
@@ -106,23 +138,28 @@
             byte[] pemCertBytes = Encoding.UTF8.GetBytes(certString);
             byte[] uniqueId = GenerateRandomBytes(8);
 
+            // Create the HTTP client.
+            HttpBaseProtocolFilter filter = new HttpBaseProtocolFilter();
+            filter.IgnorableServerCertificateErrors.Add(ChainValidationResult.Untrusted);
+            filter.IgnorableServerCertificateErrors.Add(ChainValidationResult.InvalidName);
+            filter.ClientCertificate = uwpCertificate;
+
+            HttpClient httpClient = new HttpClient(filter);
+
             // Unpair before doing anything else in this test app.
-            using (HttpClient httpClient = new HttpClient())
+            string uriString =
+                string.Format(
+                    "http://{0}:47989/unpair?uniqueid={1}&uuid={2}",
+                    ipAddressTextBox.Text,
+                    BytesToHex(uniqueId),
+                    Guid.NewGuid());
+            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
             {
-                string uriString =
-                    string.Format(
-                        "http://{0}:47989/unpair?uniqueid={1}&uuid={2}",
-                        ipAddressTextBox.Text,
-                        BytesToHex(uniqueId),
-                        Guid.NewGuid());
-                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
+                using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
                 {
-                    using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
-                    {
-                        outputTextBox.Text = $"Unpair status code: {response.StatusCode}\n";
-                        string responseContent = await response.Content.ReadAsStringAsync();
-                        outputTextBox.Text += responseContent + "\n";
-                    }
+                    outputTextBox.Text = $"Unpair status code: {response.StatusCode}\n";
+                    string responseContent = await response.Content.ReadAsStringAsync();
+                    outputTextBox.Text += responseContent + "\n";
                 }
             }
 
@@ -133,28 +170,25 @@
             // Get server certificate.
             // TODO: Call should have no timeout because it requires the user to enter a pin.
             PairResponse pairResponse = null;
-            using (HttpClient httpClient = new HttpClient())
+            uriString =
+                string.Format(
+                    "http://{0}:47989/pair?uniqueid={1}&uuid={2}&devicename=roth&updateState=1&phrase=getservercert&salt={3}&clientcert={4}",
+                    ipAddressTextBox.Text,
+                    BytesToHex(uniqueId),
+                    Guid.NewGuid(),
+                    BytesToHex(salt),
+                    BytesToHex(pemCertBytes));
+            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
             {
-                string uriString =
-                    string.Format(
-                        "http://{0}:47989/pair?uniqueid={1}&uuid={2}&devicename=roth&updateState=1&phrase=getservercert&salt={3}&clientcert={4}",
-                        ipAddressTextBox.Text,
-                        BytesToHex(uniqueId),
-                        Guid.NewGuid(),
-                        BytesToHex(salt),
-                        BytesToHex(pemCertBytes));
-                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
+                using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
                 {
-                    using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
+                    outputTextBox.Text = $"Get server cert status code: {response.StatusCode}\n";
+                    string responseContent = await response.Content.ReadAsStringAsync();
+                    outputTextBox.Text += responseContent + "\n";
+                    using (StringReader reader = new StringReader(responseContent))
                     {
-                        outputTextBox.Text = $"Get server cert status code: {response.StatusCode}\n";
-                        string responseContent = await response.Content.ReadAsStringAsync();
-                        outputTextBox.Text += responseContent + "\n";
-                        using (StringReader reader = new StringReader(responseContent))
-                        {
-                            XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
-                            pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
-                        }
+                        XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
+                        pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
                     }
                 }
             }
@@ -173,7 +207,7 @@
 
             // Parse server certificate
             byte[] serverCertBytes = HexToBytes(pairResponse.PlainCert);
-            X509Certificate serverCertificate = new X509CertificateParser().ReadCertificate(serverCertBytes);
+            BouncyCastleX509Certificate serverCertificate = new X509CertificateParser().ReadCertificate(serverCertBytes);
 
             // Hash the salt and pin and use it to generate an AES key. 
             byte[] hashedSaltAndPin = HashData(hashAlgorithm, saltAndPin);
@@ -187,27 +221,24 @@
 
             // Send the encrypted challenge to the server.
             // TODO: Call should have a timeout.
-            using (HttpClient httpClient = new HttpClient())
-            {
-                string uriString =
+            uriString =
                     string.Format(
                         "http://{0}:47989/pair?uniqueid={1}&uuid={2}&devicename=roth&updateState=1&clientchallenge={3}",
                         ipAddressTextBox.Text,
                         BytesToHex(uniqueId),
                         Guid.NewGuid(),
                         BytesToHex(encryptedChallenge));
-                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
+            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
+            {
+                using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
                 {
-                    using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
+                    outputTextBox.Text = $"Send challenge status code: {response.StatusCode}\n";
+                    string responseContent = await response.Content.ReadAsStringAsync();
+                    outputTextBox.Text += responseContent + "\n";
+                    using (StringReader reader = new StringReader(responseContent))
                     {
-                        outputTextBox.Text = $"Send challenge status code: {response.StatusCode}\n";
-                        string responseContent = await response.Content.ReadAsStringAsync();
-                        outputTextBox.Text += responseContent + "\n";
-                        using (StringReader reader = new StringReader(responseContent))
-                        {
-                            XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
-                            pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
-                        }
+                        XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
+                        pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
                     }
                 }
             }
@@ -230,9 +261,9 @@
             // Using another 16 byte secret, compute a challenge response hash using the secret, 
             // our certificate signature, and the challenge.
             byte[] clientSecret = GenerateRandomBytes(16);
-            byte[] challengeResponseHash = 
+            byte[] challengeResponseHash =
                 HashData(
-                    hashAlgorithm, 
+                    hashAlgorithm,
                     ConcatenateByteArrays(serverChallenge, certificate.GetSignature(), clientSecret));
             byte[] encryptedChallengeResponse = DoAesCipher(true, aesKey, challengeResponseHash);
 
@@ -240,27 +271,24 @@
 
             // Send the challenge response to the server.
             // TODO: Call should have a timeout.
-            using (HttpClient httpClient = new HttpClient())
-            {
-                string uriString =
+            uriString =
                     string.Format(
                         "http://{0}:47989/pair?uniqueid={1}&uuid={2}&devicename=roth&updateState=1&serverchallengeresp={3}",
                         ipAddressTextBox.Text,
                         BytesToHex(uniqueId),
                         Guid.NewGuid(),
                         BytesToHex(encryptedChallengeResponse));
-                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
+            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
+            {
+                using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
                 {
-                    using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
+                    outputTextBox.Text = $"Send challenge response status code: {response.StatusCode}\n";
+                    string responseContent = await response.Content.ReadAsStringAsync();
+                    outputTextBox.Text += responseContent + "\n";
+                    using (StringReader reader = new StringReader(responseContent))
                     {
-                        outputTextBox.Text = $"Send challenge response status code: {response.StatusCode}\n";
-                        string responseContent = await response.Content.ReadAsStringAsync();
-                        outputTextBox.Text += responseContent + "\n";
-                        using (StringReader reader = new StringReader(responseContent))
-                        {
-                            XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
-                            pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
-                        }
+                        XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
+                        pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
                     }
                 }
             }
@@ -310,27 +338,24 @@
                 ConcatenateByteArrays(
                     clientSecret,
                     signedSecret);
-            using (HttpClient httpClient = new HttpClient())
-            {
-                string uriString =
+            uriString =
                     string.Format(
                         "http://{0}:47989/pair?uniqueid={1}&uuid={2}&devicename=roth&updateState=1&clientpairingsecret={3}",
                         ipAddressTextBox.Text,
                         BytesToHex(uniqueId),
                         Guid.NewGuid(),
                         BytesToHex(clientPairingSecret));
-                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
+            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
+            {
+                using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
                 {
-                    using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
+                    outputTextBox.Text = $"Send client pairing secret status code: {response.StatusCode}\n";
+                    string responseContent = await response.Content.ReadAsStringAsync();
+                    outputTextBox.Text += responseContent + "\n";
+                    using (StringReader reader = new StringReader(responseContent))
                     {
-                        outputTextBox.Text = $"Send client pairing secret status code: {response.StatusCode}\n";
-                        string responseContent = await response.Content.ReadAsStringAsync();
-                        outputTextBox.Text += responseContent + "\n";
-                        using (StringReader reader = new StringReader(responseContent))
-                        {
-                            XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
-                            pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
-                        }
+                        XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
+                        pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
                     }
                 }
             }
@@ -346,26 +371,23 @@
 
             // Do the initial challenge (seems neccessary for us to show as paired).
             // TODO: Call should have a timeout.
-            using (HttpClient httpClient = new HttpClient())
-            {
-                string uriString =
+            uriString =
                     string.Format(
-                        "http://{0}:47989/pair?uniqueid={1}&uuid={2}&devicename=roth&updateState=1&phrase=pairchallenge",
+                        "https://{0}:47984/pair?uniqueid={1}&uuid={2}&devicename=roth&updateState=1&phrase=pairchallenge",
                         ipAddressTextBox.Text,
                         BytesToHex(uniqueId),
                         Guid.NewGuid());
-                using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
+            using (HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, new Uri(uriString)))
+            {
+                using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
                 {
-                    using (HttpResponseMessage response = await httpClient.SendRequestAsync(request))
+                    outputTextBox.Text = $"Send pair challenge status code: {response.StatusCode}\n";
+                    string responseContent = await response.Content.ReadAsStringAsync();
+                    outputTextBox.Text += responseContent + "\n";
+                    using (StringReader reader = new StringReader(responseContent))
                     {
-                        outputTextBox.Text = $"Send pair challenge status code: {response.StatusCode}\n";
-                        string responseContent = await response.Content.ReadAsStringAsync();
-                        outputTextBox.Text += responseContent + "\n";
-                        using (StringReader reader = new StringReader(responseContent))
-                        {
-                            XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
-                            pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
-                        }
+                        XmlSerializer serializer = new XmlSerializer(typeof(PairResponse));
+                        pairResponse = serializer.Deserialize(new StringReader(responseContent)) as PairResponse;
                     }
                 }
             }
