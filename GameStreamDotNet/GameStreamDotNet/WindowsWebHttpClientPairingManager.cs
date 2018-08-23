@@ -91,11 +91,10 @@
                 InstallOptions.DeleteExpired,
                 friendlyName);
 
-            // Read the modified cert from the cert store
+            // Read the UWP cert from the cert store
             Certificate uwpCertificate =
                 (await CertificateStores.FindAllAsync(
                     new CertificateQuery { FriendlyName = friendlyName }))[0];
-            certificate = new X509CertificateParser().ReadCertificate(uwpCertificate.GetCertificateBlob().AsStream());
 
             string keyString;
             using (StringWriter keyWriter = new StringWriter())
@@ -382,6 +381,8 @@
                 // TODO: Unpair as above.
                 return;
             }
+
+            await Task.Delay(2000);
 
             outputTextBox.Text = "Pairing succeeded!\n";
         }

@@ -98,7 +98,6 @@
                     pfxDataBytes, 
                     password,
                     X509KeyStorageFlags.PersistKeySet);
-            certificate = DotNetUtilities.FromX509Certificate(systemCertificate);
 
             string keyString;
             using (StringWriter keyWriter = new StringWriter())
@@ -386,6 +385,8 @@
                 // TODO: Unpair as above.
                 return;
             }
+
+            await Task.Delay(2000);
 
             outputTextBox.Text = "Pairing succeeded!\n";
         }

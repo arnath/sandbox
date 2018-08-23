@@ -10,8 +10,8 @@
         public MainPage()
         {
             this.InitializeComponent();
-            //this.pairingManager = new SystemNetHttpClientPairingManager();
-            this.pairingManager = new WindowsWebHttpClientPairingManager();
+            this.pairingManager = new SystemNetHttpClientPairingManager();
+            //this.pairingManager = new WindowsWebHttpClientPairingManager();
         }
 
         private async void PairButton_Click(object sender, RoutedEventArgs e)
