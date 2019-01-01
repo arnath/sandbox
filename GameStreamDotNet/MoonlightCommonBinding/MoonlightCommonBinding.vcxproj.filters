@@ -1,0 +1,178 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Resources">
+      <UniqueIdentifier>b6c616ed-a621-4e3f-9ef7-cde28463d2dc</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tga;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="reedsolomon">
+      <UniqueIdentifier>{77ea1315-14d7-49a1-bd71-23aeb2359baf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="enet">
+      <UniqueIdentifier>{724f7e6e-3a0d-48ce-8954-d79cc299719d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="moonlight-common-c">
+      <UniqueIdentifier>{332ef167-32ea-4fd9-8870-e398802c409f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="moonlight-common-c\reedsolomon\rs.c">
+      <Filter>reedsolomon</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\enet\callbacks.c">
+      <Filter>enet</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\enet\compress.c">
+      <Filter>enet</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\enet\host.c">
+      <Filter>enet</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\enet\list.c">
+      <Filter>enet</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\enet\packet.c">
+      <Filter>enet</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\enet\peer.c">
+      <Filter>enet</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\enet\protocol.c">
+      <Filter>enet</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\enet\unix.c">
+      <Filter>enet</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\enet\vita.c">
+      <Filter>enet</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\enet\win32.c">
+      <Filter>enet</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\AudioStream.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\ByteBuffer.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\Connection.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\ControlStream.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\FakeCallbacks.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\InputStream.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\LinkedBlockingQueue.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\Misc.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\Platform.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\PlatformSockets.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\RtpFecQueue.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\RtpReorderQueue.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\RtspConnection.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\RtspParser.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\SdpGenerator.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\SimpleStun.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\VideoDepacketizer.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+    <ClCompile Include="moonlight-common-c\src\VideoStream.c">
+      <Filter>moonlight-common-c</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="moonlight-common-c\reedsolomon\rs.h">
+      <Filter>reedsolomon</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\src\ByteBuffer.h">
+      <Filter>moonlight-common-c</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\src\Input.h">
+      <Filter>moonlight-common-c</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\src\Limelight.h">
+      <Filter>moonlight-common-c</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\src\Limelight-internal.h">
+      <Filter>moonlight-common-c</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\src\LinkedBlockingQueue.h">
+      <Filter>moonlight-common-c</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\src\Platform.h">
+      <Filter>moonlight-common-c</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\src\PlatformSockets.h">
+      <Filter>moonlight-common-c</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\src\PlatformThreads.h">
+      <Filter>moonlight-common-c</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\src\RtpFecQueue.h">
+      <Filter>moonlight-common-c</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\src\RtpReorderQueue.h">
+      <Filter>moonlight-common-c</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\src\Rtsp.h">
+      <Filter>moonlight-common-c</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\src\Video.h">
+      <Filter>moonlight-common-c</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\enet\include\enet\callbacks.h">
+      <Filter>enet</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\enet\include\enet\enet.h">
+      <Filter>enet</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\enet\include\enet\list.h">
+      <Filter>enet</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\enet\include\enet\protocol.h">
+      <Filter>enet</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\enet\include\enet\time.h">
+      <Filter>enet</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\enet\include\enet\types.h">
+      <Filter>enet</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\enet\include\enet\unix.h">
+      <Filter>enet</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\enet\include\enet\utility.h">
+      <Filter>enet</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\enet\include\enet\vita.h">
+      <Filter>enet</Filter>
+    </ClInclude>
+    <ClInclude Include="moonlight-common-c\enet\include\enet\win32.h">
+      <Filter>enet</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
