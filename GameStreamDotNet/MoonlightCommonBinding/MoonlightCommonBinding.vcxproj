@@ -205,6 +205,7 @@
     <ClInclude Include="moonlight-common-c\src\RtpReorderQueue.h" />
     <ClInclude Include="moonlight-common-c\src\Rtsp.h" />
     <ClInclude Include="moonlight-common-c\src\Video.h" />
+    <ClInclude Include="StreamConfiguration.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{91324e5b-47b0-4b5c-b7bd-7a9ee158723e}</ProjectGuid>

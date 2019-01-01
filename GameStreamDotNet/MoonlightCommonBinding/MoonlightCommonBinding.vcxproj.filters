@@ -174,5 +174,6 @@
     <ClInclude Include="moonlight-common-c\enet\include\enet\win32.h">
       <Filter>enet</Filter>
     </ClInclude>
+    <ClInclude Include="StreamConfiguration.h" />
   </ItemGroup>
 </Project>
