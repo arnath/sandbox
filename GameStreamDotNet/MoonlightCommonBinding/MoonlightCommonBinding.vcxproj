@@ -180,8 +180,12 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PreprocessorDefinitions>_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
+    <ClCompile Include="MoonlightCommonInterop.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="IAudioRendererCallbacks.h" />
+    <ClInclude Include="IConnectionListener.h" />
+    <ClInclude Include="IVideoRenderer.h" />
     <ClInclude Include="moonlight-common-c\enet\include\enet\callbacks.h" />
     <ClInclude Include="moonlight-common-c\enet\include\enet\enet.h" />
     <ClInclude Include="moonlight-common-c\enet\include\enet\list.h" />
@@ -205,6 +209,7 @@
     <ClInclude Include="moonlight-common-c\src\RtpReorderQueue.h" />
     <ClInclude Include="moonlight-common-c\src\Rtsp.h" />
     <ClInclude Include="moonlight-common-c\src\Video.h" />
+    <ClInclude Include="MoonlightCommonInterop.h" />
     <ClInclude Include="StreamConfiguration.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -315,7 +320,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <GenerateManifest>false</GenerateManifest>
-    <IncludePath>C:\Users\Vijay\Documents\GitHub\sandbox\GameStreamDotNet\MoonlightCommonBinding\moonlight-common-c\reedsolomon;C:\Users\Vijay\Documents\GitHub\sandbox\GameStreamDotNet\MoonlightCommonBinding\moonlight-common-c\enet\include;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\Vijay\Documents\GitHub\sandbox\GameStreamDotNet\MoonlightCommonBinding\moonlight-common-c\src;C:\Users\Vijay\Documents\GitHub\sandbox\GameStreamDotNet\MoonlightCommonBinding\moonlight-common-c\reedsolomon;C:\Users\Vijay\Documents\GitHub\sandbox\GameStreamDotNet\MoonlightCommonBinding\moonlight-common-c\enet\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <GenerateManifest>false</GenerateManifest>
