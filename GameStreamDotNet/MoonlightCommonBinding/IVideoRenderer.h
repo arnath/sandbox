@@ -18,7 +18,7 @@ namespace Moonlight
 
 				void Cleanup();
 
-				int HandleFrame(const Array<unsigned char>^ frameData, int frameType, int frameNumber, long receiveTimeMs);
+				int HandleFrame(const Array<unsigned char>^ frameData, int frameType, int frameNumber, __int64 receiveTimeMs);
 			};
 		}
 	}
